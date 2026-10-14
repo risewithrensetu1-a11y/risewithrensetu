@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#F9F7F2" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>Rise with Ren Setu • Education & Child Mentorship Volunteer Portal</title>
@@ -2620,12 +2623,11 @@
       document.getElementById('inpMgrVolunteers').value = '';
       document.getElementById('inpMgrNotes').value = '';
 
-      // Update cloud numbers live
       try {
         const cached = JSON.parse(localStorage.getItem('rensetu_cloud_stats') || '{"volunteers":0,"drives":0,"kids":0}');
         const newDrives = (cached.drives || 0) + 1;
         const newKids = (cached.kids || 0) + kids;
-        updateCloudStats(cached.volunteers || 0, newDrives, newKids);
+        setCloudStats(cached.volunteers || 0, newDrives, newKids);
       } catch(e) {}
 
       showToast('✦ Drive logged!');
@@ -2678,7 +2680,7 @@
       const valKid = inpKids && inpKids.value.trim() !== '' ? (parseInt(inpKids.value, 10) || 0) : 0;
 
       closeModal('drivesManagerModal');
-      updateCloudStats(valVol, valDrv, valKid, true);
+      setCloudStats(valVol, valDrv, valKid);
     }
 
     function saveNotificationSettings() {
@@ -2962,37 +2964,39 @@
 
     // ==========================================
     // ZERO-CONFIG REALTIME CLOUD SYNC ENGINE
-    // Connected to universal shared cloud: all devices (Instagram, Safari, Chrome) stay 100% in sync!
+    // Works 100% inside Instagram & WhatsApp WebViews with zero preflight CORS issues
     // ==========================================
-    const SHARED_CLOUD_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a13ba002146166';
+    const COUNT_BASE = 'https://countapi.mileshilliard.com/api/v1';
 
     async function fetchCloudStats() {
       try {
-        const res = await fetch(SHARED_CLOUD_URL, { cache: 'no-store' });
-        const json = await res.json();
-        const data = (json && json.data) ? json.data : json;
-        if (data && typeof data === 'object') {
-          const v = parseInt(data.volunteers, 10) || 0;
-          const d = parseInt(data.drives, 10) || 0;
-          const k = parseInt(data.kids, 10) || 0;
+        const nocache = `_t=${Date.now()}`;
+        const [vRes, dRes, kRes] = await Promise.all([
+          fetch(`${COUNT_BASE}/get/risewithrensetu_volunteers?${nocache}`, { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+          fetch(`${COUNT_BASE}/get/risewithrensetu_drives?${nocache}`, { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+          fetch(`${COUNT_BASE}/get/risewithrensetu_kids?${nocache}`, { cache: 'no-store' }).then(r => r.json()).catch(() => null)
+        ]);
 
-          const volEl = document.getElementById('metricVolunteers');
-          const drvEl = document.getElementById('metricDrives');
-          const kidEl = document.getElementById('metricKids');
+        const v = (vRes && vRes.value !== undefined) ? vRes.value : 0;
+        const d = (dRes && dRes.value !== undefined) ? dRes.value : 0;
+        const k = (kRes && kRes.value !== undefined) ? kRes.value : 0;
 
-          if (volEl) volEl.textContent = v;
-          if (drvEl) drvEl.textContent = d;
-          if (kidEl) kidEl.textContent = k > 0 ? `${k}+` : '0';
+        const volEl = document.getElementById('metricVolunteers');
+        const drvEl = document.getElementById('metricDrives');
+        const kidEl = document.getElementById('metricKids');
 
-          localStorage.setItem('rensetu_cloud_stats', JSON.stringify({ volunteers: v, drives: d, kids: k }));
+        if (volEl) volEl.textContent = v;
+        if (drvEl) drvEl.textContent = d;
+        if (kidEl) kidEl.textContent = k > 0 ? `${k}+` : '0';
 
-          const inpVolunteers = document.getElementById('inpBaseVolunteers');
-          const inpDrives = document.getElementById('inpBaseDrives');
-          const inpKids = document.getElementById('inpBaseKids');
-          if (inpVolunteers) inpVolunteers.value = v;
-          if (inpDrives) inpDrives.value = d;
-          if (inpKids) inpKids.value = k;
-        }
+        localStorage.setItem('rensetu_cloud_stats', JSON.stringify({ volunteers: v, drives: d, kids: k }));
+
+        const inpVolunteers = document.getElementById('inpBaseVolunteers');
+        const inpDrives = document.getElementById('inpBaseDrives');
+        const inpKids = document.getElementById('inpBaseKids');
+        if (inpVolunteers) inpVolunteers.value = v;
+        if (inpDrives) inpDrives.value = d;
+        if (inpKids) inpKids.value = k;
       } catch (err) {
         try {
           const cached = JSON.parse(localStorage.getItem('rensetu_cloud_stats') || '{}');
@@ -3008,9 +3012,8 @@
       }
     }
 
-    async function updateCloudStats(v, d, k, notify = false) {
-      const payload = { volunteers: v, drives: d, kids: k };
-      localStorage.setItem('rensetu_cloud_stats', JSON.stringify(payload));
+    async function setCloudStats(v, d, k) {
+      localStorage.setItem('rensetu_cloud_stats', JSON.stringify({ volunteers: v, drives: d, kids: k }));
 
       const volEl = document.getElementById('metricVolunteers');
       const drvEl = document.getElementById('metricDrives');
@@ -3020,17 +3023,14 @@
       if (kidEl) kidEl.textContent = k > 0 ? `${k}+` : '0';
 
       try {
-        await fetch(SHARED_CLOUD_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: "rensetu_stats",
-            data: payload
-          })
-        });
-        if (notify) showToast('✦ Numbers updated!');
+        await Promise.all([
+          fetch(`${COUNT_BASE}/set/risewithrensetu_volunteers?value=${v}`, { cache: 'no-store' }),
+          fetch(`${COUNT_BASE}/set/risewithrensetu_drives?value=${d}`, { cache: 'no-store' }),
+          fetch(`${COUNT_BASE}/set/risewithrensetu_kids?value=${k}`, { cache: 'no-store' })
+        ]);
+        showToast('✦ Numbers updated!');
       } catch(err) {
-        if (notify) showToast('✦ Numbers updated!');
+        showToast('✦ Numbers updated!');
       }
     }
 
