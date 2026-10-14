@@ -2653,7 +2653,7 @@
         updateCloudStats(cached.volunteers || 0, newDrives, newKids);
       } catch(e) {}
 
-      showToast('✦ Drive logged! Live numbers updated on all phones.');
+      showToast('✦ Drive logged!');
       switchManagerTab('history');
     }
 
@@ -2703,8 +2703,7 @@
       const valKid = inpKids && inpKids.value.trim() !== '' ? (parseInt(inpKids.value, 10) || 0) : 0;
 
       closeModal('drivesManagerModal');
-      showToast('⏳ Updating numbers for all phones worldwide...');
-      updateCloudStats(valVol, valDrv, valKid);
+      updateCloudStats(valVol, valDrv, valKid, true);
     }
 
     function saveNotificationSettings() {
@@ -3044,7 +3043,7 @@
       }
     }
 
-    async function updateCloudStats(v, d, k) {
+    async function updateCloudStats(v, d, k, notify = false) {
       const payload = { volunteers: v, drives: d, kids: k };
       localStorage.setItem('rensetu_cloud_stats', JSON.stringify(payload));
 
@@ -3064,9 +3063,9 @@
             data: payload
           })
         });
-        showToast('✦ Live numbers updated across ALL phones!');
+        if (notify) showToast('✦ Numbers updated!');
       } catch(err) {
-        showToast('✦ Numbers updated on this phone!');
+        if (notify) showToast('✦ Numbers updated!');
       }
     }
 
@@ -3076,4 +3075,3 @@
   </script>
 </body>
 </html>
-
