@@ -2190,59 +2190,34 @@
       }
     }
 
-    // --- Dynamic Live Counts ---
+    // --- Dynamic Live Counts (Source of truth: Live Cloud & Screen) ---
     function getLiveCounts() {
-      let storedVolunteers = [];
+      let cloud = {};
       try {
-        storedVolunteers = JSON.parse(localStorage.getItem('aastha_volunteers') || '[]');
-      } catch (e) {
-        storedVolunteers = [];
-      }
+        cloud = JSON.parse(localStorage.getItem('rensetu_cloud_stats') || '{}');
+      } catch (e) {}
 
-      let storedDrives = [];
-      try {
-        storedDrives = JSON.parse(localStorage.getItem('aastha_drives_log') || '[]');
-      } catch (e) {
-        storedDrives = [];
-      }
+      const volEl = document.getElementById('metricVolunteers');
+      const drvEl = document.getElementById('metricDrives');
+      const kidEl = document.getElementById('metricKids');
 
-      let customStats = {};
-      try {
-        customStats = JSON.parse(localStorage.getItem('aastha_custom_stats') || '{}');
-      } catch (e) {
-        customStats = {};
-      }
+      const v = (cloud.volunteers !== undefined && cloud.volunteers !== null) 
+                ? parseInt(cloud.volunteers, 10) 
+                : (volEl ? parseInt(volEl.textContent, 10) || 0 : 0);
 
-      let totalVolunteers = BASELINE_VOLUNTEERS + storedVolunteers.length;
-      if (customStats.baseVolunteers !== undefined && customStats.baseVolunteers !== null && customStats.baseVolunteers !== '') {
-        const baseVol = parseInt(customStats.baseVolunteers, 10) || 0;
-        const anchor = customStats.baseVolunteersAnchor !== undefined ? (parseInt(customStats.baseVolunteersAnchor, 10) || 0) : 0;
-        const addedSince = Math.max(0, storedVolunteers.length - anchor);
-        totalVolunteers = baseVol + addedSince;
-      }
+      const d = (cloud.drives !== undefined && cloud.drives !== null) 
+                ? parseInt(cloud.drives, 10) 
+                : (drvEl ? parseInt(drvEl.textContent, 10) || 0 : 0);
 
-      let totalDrives = BASELINE_DRIVES + storedDrives.length;
-      if (customStats.baseDrives !== undefined && customStats.baseDrives !== null && customStats.baseDrives !== '') {
-        const baseDrv = parseInt(customStats.baseDrives, 10) || 0;
-        const anchor = customStats.baseDrivesAnchor !== undefined ? (parseInt(customStats.baseDrivesAnchor, 10) || 0) : 0;
-        const addedSince = Math.max(0, storedDrives.length - anchor);
-        totalDrives = baseDrv + addedSince;
-      }
-
-      const loggedKidsSum = storedDrives.reduce((sum, d) => sum + (parseInt(d.kids, 10) || 0), 0);
-      let totalKids = BASELINE_KIDS + loggedKidsSum;
-      if (customStats.baseKids !== undefined && customStats.baseKids !== null && customStats.baseKids !== '') {
-        const baseKid = parseInt(customStats.baseKids, 10) || 0;
-        const anchor = customStats.baseKidsAnchor !== undefined ? (parseInt(customStats.baseKidsAnchor, 10) || 0) : 0;
-        const addedSince = Math.max(0, loggedKidsSum - anchor);
-        totalKids = baseKid + addedSince;
-      }
+      const k = (cloud.kids !== undefined && cloud.kids !== null) 
+                ? parseInt(cloud.kids, 10) 
+                : (kidEl ? parseInt(kidEl.textContent, 10) || 0 : 0);
 
       return {
-        totalVolunteers,
-        totalDrives,
-        totalKids,
-        myVolunteerIndex: totalVolunteers
+        totalVolunteers: v,
+        totalDrives: d,
+        totalKids: k,
+        myVolunteerIndex: v
       };
     }
 
@@ -2860,12 +2835,13 @@
         "Applied At (IST)": newApplicant.appliedAt
       };
 
-      // 1. Save in device's localStorage
+      // 1. Save applicant in local roster for Admin view
       storedVolunteers.unshift(newApplicant);
       localStorage.setItem('aastha_volunteers', JSON.stringify(storedVolunteers.slice(0, 300)));
-      updateLiveCountersUI(true);
 
-      // 2. Confirmation state prepared
+      // 2. Animate public volunteer counter UP by 1 on screen
+      const volEl = document.getElementById('metricVolunteers');
+      if (volEl) volEl.textContent = assignedNumber;
 
       // 3. UI Display Update
       const assignedBadge = document.getElementById('assignedVolunteerBadge');
@@ -2887,12 +2863,8 @@
       // 4. Background Dispatches (FormSubmit Email + Optional Webhook)
       dispatchInBackground(targetEmail, emailPayload, customWebhook, newApplicant);
 
-      // Increment cloud volunteer count for all phones
-      try {
-        const cached = JSON.parse(localStorage.getItem('rensetu_cloud_stats') || '{"volunteers":0,"drives":0,"kids":0}');
-        const newVol = (cached.volunteers || 0) + 1;
-        updateCloudStats(newVol, cached.drives || 0, cached.kids || 0);
-      } catch(e) {}
+      // 5. Update Cloud Counter safely: keep current drives and kids untouched!
+      updateCloudStats(assignedNumber, currentCounts.totalDrives, currentCounts.totalKids, false);
 
       // 5. Switch to Confirmation Step
       setTimeout(() => {
