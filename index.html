@@ -1706,7 +1706,7 @@
 
               <div style="text-align: center;">
                 <div class="volunteer-num-badge" id="assignedVolunteerBadge">
-                  <span>🎉 Volunteer #1</span>
+                  <span>🎉 Application Received!</span>
                 </div>
                 <h3 style="font-size: 1.5rem; margin-bottom: 6px;">Application Submitted Successfully!</h3>
                 <p style="font-size: 0.9rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">
@@ -2839,14 +2839,10 @@
       storedVolunteers.unshift(newApplicant);
       localStorage.setItem('aastha_volunteers', JSON.stringify(storedVolunteers.slice(0, 300)));
 
-      // 2. Animate public volunteer counter UP by 1 on screen
-      const volEl = document.getElementById('metricVolunteers');
-      if (volEl) volEl.textContent = assignedNumber;
-
-      // 3. UI Display Update
+      // 2. UI Confirmation Display (Public numbers remain 100% under Admin control)
       const assignedBadge = document.getElementById('assignedVolunteerBadge');
       if (assignedBadge) {
-        assignedBadge.innerHTML = `<span>🎉 You are Volunteer #${assignedNumber}!</span>`;
+        assignedBadge.innerHTML = `<span>🎉 Application Received!</span>`;
       }
 
       const detailsBox = document.getElementById('confirmationDetailsBox');
@@ -2860,11 +2856,8 @@
         `;
       }
 
-      // 4. Background Dispatches (FormSubmit Email + Optional Webhook)
+      // 3. Background Dispatches (FormSubmit Email to risewithrensetu1@gmail.com)
       dispatchInBackground(targetEmail, emailPayload, customWebhook, newApplicant);
-
-      // 5. Update Cloud Counter safely: keep current drives and kids untouched!
-      updateCloudStats(assignedNumber, currentCounts.totalDrives, currentCounts.totalKids, false);
 
       // 5. Switch to Confirmation Step
       setTimeout(() => {
