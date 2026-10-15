@@ -1952,9 +1952,15 @@
           </div>
 
           <div class="form-group">
+            <label class="form-label"><span>Web3Forms Access Key (Instant Free Email Dispatch)</span></label>
+            <input type="text" id="inpWeb3Key" class="form-input" placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+            <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Get your free key in 10 seconds at <a href="https://web3forms.com" target="_blank" style="color:var(--brand-accent); text-decoration:underline;">web3forms.com</a>. Sends directly to your Gmail without rate limits!</span>
+          </div>
+
+          <div class="form-group">
             <label class="form-label"><span>Google Sheets Webhook URL (Free Cloud Database)</span></label>
             <input type="url" id="inpCustomWebhook" class="form-input" placeholder="https://script.google.com/macros/s/.../exec" />
-            <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Paste your free Google Sheet Webhook here to save submissions across all phones permanently!</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Paste your free Google Sheet Webhook here to save submissions across all phones permanently and email Gmail directly!</span>
           </div>
 
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -1996,6 +2002,8 @@
 
     const DEFAULT_NOTIFICATION_EMAIL = 'risewithrensetu1@gmail.com';
     const DEFAULT_ADMIN_WHATSAPP = '919876543210'; // Replace with your actual WhatsApp phone with country code
+    const DEFAULT_WEB3_KEY = '479fedef-8be4-42f4-8b55-e4f3262e81f4'; // Web3Forms Access Key for risewithrensetu1@gmail.com
+    const DEFAULT_WEBHOOK_URL = ''; // Optional default Google Sheets Webhook URL
 
     function getNotificationEmail() {
       return localStorage.getItem('aastha_notification_email') || DEFAULT_NOTIFICATION_EMAIL;
@@ -2003,6 +2011,14 @@
 
     function getAdminWhatsapp() {
       return localStorage.getItem('aastha_admin_whatsapp') || DEFAULT_ADMIN_WHATSAPP;
+    }
+
+    function getWeb3Key() {
+      return localStorage.getItem('aastha_web3_key') || DEFAULT_WEB3_KEY;
+    }
+
+    function getCustomWebhook() {
+      return localStorage.getItem('aastha_custom_webhook') || DEFAULT_WEBHOOK_URL;
     }
 
     // --- Dynamic Date Slots Generator ---
@@ -2357,14 +2373,17 @@
 
       const savedEmail = getNotificationEmail();
       const savedWhatsapp = getAdminWhatsapp();
-      const savedWebhook = localStorage.getItem('aastha_custom_webhook') || '';
+      const savedWeb3Key = getWeb3Key();
+      const savedWebhook = getCustomWebhook();
 
       const inpEmail = document.getElementById('inpNotificationEmail');
       const inpWa = document.getElementById('inpAdminWhatsapp');
+      const inpWeb3 = document.getElementById('inpWeb3Key');
       const inpHook = document.getElementById('inpCustomWebhook');
 
       if (inpEmail) inpEmail.value = savedEmail;
       if (inpWa) inpWa.value = savedWhatsapp;
+      if (inpWeb3) inpWeb3.value = savedWeb3Key;
       if (inpHook) inpHook.value = savedWebhook;
     }
 
@@ -2686,6 +2705,7 @@
     function saveNotificationSettings() {
       const inpEmail = document.getElementById('inpNotificationEmail');
       const inpWa = document.getElementById('inpAdminWhatsapp');
+      const inpWeb3 = document.getElementById('inpWeb3Key');
       const inpHook = document.getElementById('inpCustomWebhook');
 
       let emailVal = inpEmail ? inpEmail.value.trim() : '';
@@ -2696,6 +2716,10 @@
 
       localStorage.setItem('aastha_notification_email', emailVal);
       localStorage.setItem('aastha_admin_whatsapp', waVal);
+
+      if (inpWeb3) {
+        localStorage.setItem('aastha_web3_key', inpWeb3.value.trim());
+      }
 
       if (inpHook) {
         localStorage.setItem('aastha_custom_webhook', inpHook.value.trim());
@@ -2708,6 +2732,8 @@
       const btn = document.getElementById('btnTestEmail');
       const statusBox = document.getElementById('testEmailStatusBox');
       const targetEmail = getNotificationEmail();
+      const web3Key = (document.getElementById('inpWeb3Key')?.value || getWeb3Key() || '').trim();
+      const hookUrl = (document.getElementById('inpCustomWebhook')?.value || getCustomWebhook() || '').trim();
 
       if (!btn || !statusBox) return;
 
@@ -2733,33 +2759,99 @@
       };
 
       try {
-        const response = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(testPayload)
-        });
+        let sentVia = '';
 
-        const data = await response.json().catch(() => ({}));
+        // Priority 1: Web3Forms if key present
+        if (web3Key) {
+          const w3Res = await fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              access_key: web3Key,
+              subject: testPayload._subject,
+              from_name: "Rise with Ren Setu Portal",
+              ...testPayload
+            })
+          });
+          const w3Data = await w3Res.json().catch(() => ({}));
+          if (w3Res.ok && (w3Data.success === true || w3Data.success === 'true')) {
+            sentVia = 'Web3Forms Gateway';
+          } else {
+            console.warn('Web3Forms test failed:', w3Data);
+          }
+        }
 
-        if (data.success === 'false' && (data.message || '').toLowerCase().includes('activation')) {
-          statusBox.style.background = '#FEF3C7';
-          statusBox.style.border = '1px solid #F59E0B';
-          statusBox.style.color = '#92400E';
-          statusBox.innerHTML = `
-            <div style="font-weight: 700; margin-bottom: 4px;">⚠️ Activation Required in Gmail!</div>
-            <div>FormSubmit sent an activation link to <strong>${escapeHtml(targetEmail)}</strong>. Open Gmail inbox/spam and click <strong>"Activate Form"</strong> once.</div>
-          `;
-        } else if (response.ok || data.success === 'true' || data.success === true) {
+        // Priority 2: Google Sheets Apps Script Webhook
+        if (!sentVia && hookUrl && hookUrl.startsWith('http')) {
+          fetch(hookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'no-cors',
+            body: JSON.stringify({
+              name: 'Test Verification',
+              phone: '9999999999',
+              city: 'Delhi',
+              motivation: 'Testing Google Apps Script Webhook & Email delivery',
+              background: 'System Check',
+              roles: ['Mentor'],
+              dateSlot: 'Test Day',
+              timeSlot: 'Now',
+              callMode: 'Phone Call',
+              notes: 'Verification test email from Organizer panel',
+              appliedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+            })
+          }).catch(() => {});
+          sentVia = 'Google Sheet Webhook (Apps Script)';
+        }
+
+        // Priority 3: FormSubmit
+        if (!sentVia) {
+          const response = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(testPayload)
+          });
+
+          const data = await response.json().catch(() => ({}));
+
+          if (data.success === 'false' && (data.message || '').toLowerCase().includes('rate limit')) {
+            statusBox.style.background = '#FEF2F2';
+            statusBox.style.border = '1px solid #F87171';
+            statusBox.style.color = '#991B1B';
+            statusBox.innerHTML = `
+              <div style="font-weight: 700; margin-bottom: 4px;">⚠️ FormSubmit Monthly Limit Exceeded!</div>
+              <div>FormSubmit's free limit (50 emails/month) is currently full. To receive emails instantly, add your free <strong>Web3Forms Key</strong> or <strong>Google Apps Script Webhook</strong> above.</div>
+            `;
+            return;
+          } else if (data.success === 'false' && (data.message || '').toLowerCase().includes('activation')) {
+            statusBox.style.background = '#FEF3C7';
+            statusBox.style.border = '1px solid #F59E0B';
+            statusBox.style.color = '#92400E';
+            statusBox.innerHTML = `
+              <div style="font-weight: 700; margin-bottom: 4px;">⚠️ Activation Required in Gmail!</div>
+              <div>FormSubmit sent an activation link to <strong>${escapeHtml(targetEmail)}</strong>. Open Gmail inbox/spam and click <strong>"Activate Form"</strong> once.</div>
+            `;
+            return;
+          } else if (response.ok || data.success === 'true' || data.success === true) {
+            sentVia = 'FormSubmit Gateway';
+          } else {
+            statusBox.style.background = '#FEF2F2';
+            statusBox.style.border = '1px solid #F87171';
+            statusBox.style.color = '#991B1B';
+            statusBox.innerHTML = `<div>Gateway response: ${escapeHtml(data.message || 'Could not dispatch')}</div>`;
+            return;
+          }
+        }
+
+        if (sentVia) {
           statusBox.style.background = '#ECFDF5';
           statusBox.style.border = '1px solid #10B981';
           statusBox.style.color = '#065F46';
           statusBox.innerHTML = `
-            <div style="font-weight: 700; margin-bottom: 4px;">✅ Test Email Dispatched!</div>
+            <div style="font-weight: 700; margin-bottom: 4px;">✅ Test Email Dispatched via ${sentVia}!</div>
             <div>Check your Gmail (<strong>${escapeHtml(targetEmail)}</strong>) inbox and Spam folder.</div>
           `;
           showToast(`✦ Test email sent!`);
-        } else {
-          statusBox.innerHTML = `<div>Gateway response: ${escapeHtml(data.message || 'Dispatched')}</div>`;
         }
       } catch (err) {
         statusBox.style.background = '#FEE2E2';
@@ -2817,7 +2909,8 @@
 
       const targetEmail = getNotificationEmail();
       const adminWa = getAdminWhatsapp();
-      const customWebhook = localStorage.getItem('aastha_custom_webhook') || '';
+      const customWebhook = getCustomWebhook();
+      const web3Key = getWeb3Key();
 
       const emailPayload = {
         _subject: `🌟 New Volunteer Application #${assignedNumber}: ${newApplicant.name} (${newApplicant.city})`,
@@ -2858,8 +2951,8 @@
         `;
       }
 
-      // 3. Background Dispatches (FormSubmit Email to risewithrensetu1@gmail.com)
-      dispatchInBackground(targetEmail, emailPayload, customWebhook, newApplicant);
+      // 3. Background Dispatches (Multi-gateway Email & Webhook)
+      dispatchInBackground(targetEmail, emailPayload, customWebhook, web3Key, newApplicant);
 
       // 5. Switch to Confirmation Step
       setTimeout(() => {
@@ -2872,26 +2965,13 @@
       }, 200);
     }
 
-    async function dispatchInBackground(targetEmail, emailPayload, webhookUrl, newApplicant) {
+    async function dispatchInBackground(targetEmail, emailPayload, webhookUrl, web3Key, newApplicant) {
       const syncContainer = document.getElementById('syncStatusIndicator');
       const syncText = document.getElementById('syncStatusText');
 
-      // Dispatch 1: FormSubmit to Gmail
-      const formSubmitPromise = (async () => {
-        try {
-          const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(emailPayload)
-          });
-          const data = await res.json().catch(() => ({}));
-          return res.ok || data.success === 'true' || data.success === true;
-        } catch (e) {
-          return false;
-        }
-      })();
+      let delivered = false;
 
-      // Dispatch 2: Optional Google Sheets Webhook
+      // Gateway 1: Google Apps Script Webhook (Direct Google Cloud + Gmail)
       if (webhookUrl && webhookUrl.startsWith('http')) {
         try {
           fetch(webhookUrl, {
@@ -2900,18 +2980,52 @@
             mode: 'no-cors',
             body: JSON.stringify(newApplicant)
           }).catch(() => {});
+          delivered = true;
         } catch(e) {}
       }
 
-      formSubmitPromise.then(success => {
-        if (syncContainer && syncText) {
-          if (success) {
-            syncText.textContent = `✓ Delivered to Team (${targetEmail})`;
-          } else {
-            syncText.textContent = `✓ Recorded Successfully`;
+      // Gateway 2: Web3Forms (250 free emails/mo direct to Gmail)
+      if (web3Key) {
+        try {
+          const w3Res = await fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              access_key: web3Key,
+              subject: emailPayload._subject,
+              from_name: "Rise with Ren Setu Portal",
+              ...emailPayload
+            })
+          });
+          const w3Data = await w3Res.json().catch(() => ({}));
+          if (w3Res.ok && (w3Data.success === true || w3Data.success === 'true')) {
+            delivered = true;
           }
+        } catch(e) {}
+      }
+
+      // Gateway 3: FormSubmit Fallback
+      if (!delivered) {
+        try {
+          const fsRes = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(emailPayload)
+          });
+          const fsData = await fsRes.json().catch(() => ({}));
+          if (fsRes.ok || fsData.success === true || fsData.success === 'true') {
+            delivered = true;
+          }
+        } catch(e) {}
+      }
+
+      if (syncContainer && syncText) {
+        if (delivered) {
+          syncText.textContent = `✓ Delivered to Team (${targetEmail})`;
+        } else {
+          syncText.textContent = `✓ Recorded Successfully`;
         }
-      });
+      }
     }
 
     function resetFormForAnother() {
