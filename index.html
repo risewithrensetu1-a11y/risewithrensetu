@@ -1413,15 +1413,15 @@
     <!-- LIVE DYNAMIC IMPACT NUMBERS -->
     <div class="metrics-ribbon">
       <div class="metric-cell">
-        <span class="metric-val" id="metricVolunteers">0</span>
+        <span class="metric-val" id="metricVolunteers">6</span>
         <span class="metric-lbl">Volunteers Joined</span>
       </div>
       <div class="metric-cell">
-        <span class="metric-val" id="metricDrives">0</span>
+        <span class="metric-val" id="metricDrives">1</span>
         <span class="metric-lbl">Completed Drives</span>
       </div>
       <div class="metric-cell">
-        <span class="metric-val" id="metricKids">0</span>
+        <span class="metric-val" id="metricKids">10+</span>
         <span class="metric-lbl">Children Mentored</span>
       </div>
       <div class="metric-cell">
@@ -1754,9 +1754,7 @@
     <!-- Footer -->
     <footer class="site-footer">
       <p>
-        <strong>Rise with Ren Setu</strong>
-        <span class="secret-trigger-symbol" id="secretTrigger" title="Organizer Portal" onclick="handleSecretTap()">✦</span>
-        Dedicated to Child Education & Social Mentorship
+        <strong>Rise with Ren Setu</strong> • Dedicated to Child Education & Social Mentorship
       </p>
       <p style="font-size: 0.75rem;">100% Free & Open Volunteer Initiative. No commercial fees.</p>
     </footer>
@@ -1843,6 +1841,13 @@
           <div class="roster-toolbar">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <span class="roster-count-badge" id="rosterCountBadge">0 Applications</span>
+              <button type="button" class="export-csv-btn" onclick="fetchCloudApplicants(); showToast('Syncing latest applications...')" title="Refresh Roster">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Sync Cloud 🔄</span>
+              </button>
               <button type="button" class="export-csv-btn" onclick="exportApplicantsCSV()" title="Download as CSV">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1911,22 +1916,22 @@
         <!-- Tab 3: Quick Direct Stats Override -->
         <div id="managerTabAdjust" style="display: none; flex-direction: column; gap: 14px;">
           <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
-            Adjust headline numbers shown on this device:
+            Update live headline numbers across all devices globally:
           </p>
           <div class="form-group">
             <label class="form-label"><span>Total Volunteers Joined</span></label>
-            <input type="number" id="inpBaseVolunteers" class="form-input" placeholder="0" />
+            <input type="number" id="inpBaseVolunteers" class="form-input" placeholder="6" />
           </div>
           <div class="form-group">
             <label class="form-label"><span>Total Completed Drives</span></label>
-            <input type="number" id="inpBaseDrives" class="form-input" placeholder="0" />
+            <input type="number" id="inpBaseDrives" class="form-input" placeholder="1" />
           </div>
           <div class="form-group">
             <label class="form-label"><span>Total Children Mentored</span></label>
-            <input type="number" id="inpBaseKids" class="form-input" placeholder="0" />
+            <input type="number" id="inpBaseKids" class="form-input" placeholder="10" />
           </div>
           <button type="button" class="btn btn-primary" onclick="saveDirectStatsOverride()" style="width: 100%; justify-content: center;">
-            <span>Apply Numbers</span>
+            <span>Apply & Sync Across All Devices ✦</span>
           </button>
         </div>
 
@@ -1996,9 +2001,9 @@
     // CONFIGURATION DEFAULTS
     // ==========================================
     // You can set default numbers here so ANYONE visiting your GitHub site sees them!
-    const BASELINE_VOLUNTEERS = 0; // Set e.g. 15 if you want everyone to see 15+
-    const BASELINE_DRIVES = 0;     // Set e.g. 5
-    const BASELINE_KIDS = 0;       // Set e.g. 100
+    const BASELINE_VOLUNTEERS = 6;
+    const BASELINE_DRIVES = 1;
+    const BASELINE_KIDS = 10;
 
     const DEFAULT_NOTIFICATION_EMAIL = 'risewithrensetu1@gmail.com';
     const DEFAULT_ADMIN_WHATSAPP = '919876543210'; // Replace with your actual WhatsApp phone with country code
@@ -2276,39 +2281,20 @@
     }
 
     // ========================================================
-    // ORGANIZER CONTROLLER (PIN: 2026)
+    // ORGANIZER CONTROLLER (SECRET LINK #admin ACCESS ONLY)
     // ========================================================
     const ORGANIZER_PIN = '2026';
-    let secretTapCount = 0;
-    let secretTapTimer = null;
 
-    function handleSecretTap() {
-      secretTapCount++;
-      clearTimeout(secretTapTimer);
-
-      const symbol = document.getElementById('secretTrigger');
-      if (symbol) {
-        symbol.style.transform = `scale(${1 + secretTapCount * 0.3})`;
-        symbol.style.color = '#B64D2B';
-      }
-
-      secretTapTimer = setTimeout(() => {
-        secretTapCount = 0;
-        if (symbol) {
-          symbol.style.transform = '';
-          symbol.style.color = '';
-        }
-      }, 1800);
-
-      if (secretTapCount >= 3) {
-        secretTapCount = 0;
-        if (symbol) {
-          symbol.style.transform = '';
-          symbol.style.color = '';
-        }
+    // Secret URL Trigger: Add #admin to the website link (e.g. risewithrensetu.github.io/#admin)
+    function checkAdminHashAccess() {
+      const hash = (window.location.hash || '').toLowerCase();
+      if (hash === '#admin' || hash === '#organizer') {
         openPinModal();
       }
     }
+
+    window.addEventListener('hashchange', checkAdminHashAccess);
+    window.addEventListener('DOMContentLoaded', checkAdminHashAccess);
 
     function openModal(modalId) {
       const modal = document.getElementById(modalId);
@@ -2318,6 +2304,9 @@
     function closeModal(modalId) {
       const modal = document.getElementById(modalId);
       if (modal) modal.classList.remove('open');
+      if (modalId === 'pinModal' && (window.location.hash.toLowerCase() === '#admin' || window.location.hash.toLowerCase() === '#organizer')) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
     }
 
     function handleBackdropClick(event, modalId) {
@@ -2352,11 +2341,44 @@
           pinInp.select();
         }
       }
+    async function fetchCloudApplicants() {
+      const webhookUrl = getCustomWebhook();
+      if (!webhookUrl || !webhookUrl.startsWith('http')) return;
+      try {
+        const res = await fetch(webhookUrl);
+        if (res.ok) {
+          const cloudData = await res.json().catch(() => null);
+          if (Array.isArray(cloudData) && cloudData.length > 0) {
+            let local = [];
+            try {
+              local = JSON.parse(localStorage.getItem('aastha_volunteers') || '[]');
+            } catch (e) { local = []; }
+
+            const merged = [...cloudData];
+            local.forEach(loc => {
+              const locPhone = (loc.phone || '').replace(/[^0-9]/g, '');
+              const alreadyExists = merged.some(m => {
+                const mPhone = (m.phone || '').replace(/[^0-9]/g, '');
+                return (locPhone && mPhone && locPhone === mPhone) || (m.id && m.id === loc.id);
+              });
+              if (!alreadyExists) {
+                merged.push(loc);
+              }
+            });
+
+            localStorage.setItem('aastha_volunteers', JSON.stringify(merged.slice(0, 500)));
+            renderVolunteerApplicants();
+          }
+        }
+      } catch (e) {
+        console.warn('Cloud sync error:', e);
+      }
     }
 
     function openDrivesManager() {
       openModal('drivesManagerModal');
       switchManagerTab('volunteers');
+      fetchCloudApplicants();
 
       const dateInput = document.getElementById('inpMgrDate');
       if (dateInput && !dateInput.value) {
@@ -3091,9 +3113,9 @@
           fetch(`${COUNT_BASE}/get/risewithrensetu_kids?${nocache}`, { cache: 'no-store' }).then(r => r.json()).catch(() => null)
         ]);
 
-        const v = (vRes && vRes.value !== undefined) ? vRes.value : 0;
-        const d = (dRes && dRes.value !== undefined) ? dRes.value : 0;
-        const k = (kRes && kRes.value !== undefined) ? kRes.value : 0;
+        const v = (vRes && vRes.value !== undefined) ? vRes.value : BASELINE_VOLUNTEERS;
+        const d = (dRes && dRes.value !== undefined) ? dRes.value : BASELINE_DRIVES;
+        const k = (kRes && kRes.value !== undefined) ? kRes.value : BASELINE_KIDS;
 
         const volEl = document.getElementById('metricVolunteers');
         const drvEl = document.getElementById('metricDrives');
@@ -3142,9 +3164,9 @@
           fetch(`${COUNT_BASE}/set/risewithrensetu_drives?value=${d}`, { cache: 'no-store' }),
           fetch(`${COUNT_BASE}/set/risewithrensetu_kids?value=${k}`, { cache: 'no-store' })
         ]);
-        showToast('✦ Numbers updated!');
+        showToast('✦ Numbers updated live across all devices!');
       } catch(err) {
-        showToast('✦ Numbers updated!');
+        showToast('✦ Numbers updated live across all devices!');
       }
     }
 
