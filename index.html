@@ -1194,13 +1194,26 @@
       gap: 8px;
     }
     .delete-applicant-btn {
-      background: transparent;
-      border: none;
-      color: #EF4444;
-      font-size: 0.75rem;
+      background: rgba(220, 38, 38, 0.08);
+      border: 1px solid rgba(220, 38, 38, 0.28);
+      color: #dc2626;
+      font-size: 0.8rem;
+      font-weight: 600;
       cursor: pointer;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .delete-applicant-btn:hover {
+      background: rgba(220, 38, 38, 0.18);
+      border-color: #dc2626;
+    }
+    .delete-applicant-btn:active {
+      transform: scale(0.96);
     }
 
     /* Drives History */
@@ -1227,14 +1240,26 @@
       gap: 10px;
     }
     .delete-drive-btn {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.25);
-      color: #EF4444;
-      padding: 4px 8px;
+      background: rgba(220, 38, 38, 0.08);
+      border: 1px solid rgba(220, 38, 38, 0.28);
+      color: #dc2626;
+      padding: 6px 12px;
       border-radius: 6px;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .delete-drive-btn:hover {
+      background: rgba(220, 38, 38, 0.18);
+      border-color: #dc2626;
+    }
+    .delete-drive-btn:active {
+      transform: scale(0.96);
     }
 
     /* Toast Notification */
@@ -1856,6 +1881,9 @@
                 </svg>
                 <span>Export CSV</span>
               </button>
+              <button type="button" class="export-csv-btn" onclick="clearAllApplicants()" style="color: #dc2626; border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.06);" title="Clear all applications">
+                <span>Clear All 🗑️</span>
+              </button>
             </div>
             <div style="flex: 1; min-width: 180px;">
               <input type="text" id="inpSearchApplicants" class="form-input" placeholder="🔍 Search by name, city, phone..." oninput="renderVolunteerApplicants()" style="padding: 6px 12px; font-size: 0.82rem;" />
@@ -1902,12 +1930,18 @@
           </div>
 
           <button type="button" class="btn btn-primary" onclick="saveNewDriveFromModal()" style="width: 100%; justify-content: center; margin-top: 4px;">
-            <span>Save Drive & Update Website ✦</span>
+            <span>Save Drive to History ✦</span>
           </button>
         </div>
 
         <!-- Tab 2: Drives History -->
         <div id="managerTabHistory" style="display: none; flex-direction: column; gap: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-light);">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);" id="drivesHistoryCountBadge">0 Drives Recorded</span>
+            <button type="button" class="export-csv-btn" onclick="clearAllDrives()" style="color: #dc2626; border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.06);" title="Clear all recorded drives">
+              <span>Clear All Drives 🗑️</span>
+            </button>
+          </div>
           <div id="drivesHistoryList" style="display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto;">
             <!-- Rendered by JS -->
           </div>
@@ -2367,12 +2401,32 @@
               local = JSON.parse(localStorage.getItem('aastha_volunteers') || '[]');
             } catch (e) { local = []; }
 
-            const merged = [...cloudData];
+            let deletedIds = [];
+            try {
+              deletedIds = JSON.parse(localStorage.getItem('aastha_deleted_volunteers') || '[]');
+            } catch (e) { deletedIds = []; }
+
+            // Filter out items that organizer explicitly deleted
+            const filteredCloud = cloudData.filter(c => {
+              if (!c) return false;
+              const cId = c.id ? String(c.id) : '';
+              const cPhone = (c.phone || '').replace(/[^0-9]/g, '');
+              if (cId && deletedIds.includes(cId)) return false;
+              if (cPhone && deletedIds.includes(cPhone)) return false;
+              return true;
+            });
+
+            const merged = [...filteredCloud];
             local.forEach(loc => {
+              if (!loc) return;
+              const locId = loc.id ? String(loc.id) : '';
               const locPhone = (loc.phone || '').replace(/[^0-9]/g, '');
+              if (locId && deletedIds.includes(locId)) return;
+              if (locPhone && deletedIds.includes(locPhone)) return;
+
               const alreadyExists = merged.some(m => {
                 const mPhone = (m.phone || '').replace(/[^0-9]/g, '');
-                return (locPhone && mPhone && locPhone === mPhone) || (m.id && m.id === loc.id);
+                return (locPhone && mPhone && locPhone === mPhone) || (locId && m.id && locId === String(m.id));
               });
               if (!alreadyExists) {
                 merged.push(loc);
@@ -2463,6 +2517,18 @@
         volunteers = [];
       }
 
+      // Ensure every applicant has an ID for robust deletion
+      let modified = false;
+      volunteers.forEach((v, idx) => {
+        if (!v.id) {
+          v.id = 'vol_' + (Date.now() - idx * 1000) + '_' + Math.floor(Math.random() * 10000);
+          modified = true;
+        }
+      });
+      if (modified) {
+        localStorage.setItem('aastha_volunteers', JSON.stringify(volunteers));
+      }
+
       const searchInput = document.getElementById('inpSearchApplicants');
       const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
@@ -2526,7 +2592,7 @@
                     <span>1-Tap WhatsApp</span>
                   </a>
                 ` : ''}
-                <select class="status-select" onchange="updateApplicantStatus('${v.id}', this.value)">
+                <select class="status-select" onchange="updateApplicantStatus('${escapeHtml(v.id)}', this.value)">
                   <option value="New Application" ${status === 'New Application' ? 'selected' : ''}>🟡 New</option>
                   <option value="Call Scheduled" ${status === 'Call Scheduled' ? 'selected' : ''}>🔵 Scheduled</option>
                   <option value="Onboarded / Active" ${status === 'Onboarded / Active' ? 'selected' : ''}>🟢 Onboarded</option>
@@ -2553,7 +2619,7 @@
 
             <div class="applicant-footer">
               <span>🕒 Applied: ${escapeHtml(v.appliedAt || 'Recent')}</span>
-              <button type="button" class="delete-applicant-btn" onclick="deleteApplicant('${v.id}')">🗑️ Remove</button>
+              <button type="button" class="delete-applicant-btn" data-id="${escapeHtml(v.id)}" onclick="deleteApplicant(this.getAttribute('data-id'))">🗑️ Remove</button>
             </div>
           </div>
         `;
@@ -2562,7 +2628,7 @@
 
     function updateApplicantStatus(id, newStatus) {
       let volunteers = JSON.parse(localStorage.getItem('aastha_volunteers') || '[]');
-      const idx = volunteers.findIndex(v => v.id === id);
+      const idx = volunteers.findIndex(v => String(v.id) === String(id));
       if (idx !== -1) {
         volunteers[idx].status = newStatus;
         localStorage.setItem('aastha_volunteers', JSON.stringify(volunteers));
@@ -2572,13 +2638,66 @@
     }
 
     function deleteApplicant(id) {
-      if (!confirm('Remove this volunteer application from this device?')) return;
-      let volunteers = JSON.parse(localStorage.getItem('aastha_volunteers') || '[]');
-      volunteers = volunteers.filter(v => v.id !== id);
+      let volunteers = [];
+      try {
+        volunteers = JSON.parse(localStorage.getItem('aastha_volunteers') || '[]');
+      } catch (e) { volunteers = []; }
+
+      const idx = volunteers.findIndex(v => String(v.id) === String(id));
+      if (idx !== -1) {
+        const removed = volunteers[idx];
+        volunteers.splice(idx, 1);
+
+        let deletedIds = [];
+        try {
+          deletedIds = JSON.parse(localStorage.getItem('aastha_deleted_volunteers') || '[]');
+        } catch (e) { deletedIds = []; }
+
+        if (removed.id && !deletedIds.includes(String(removed.id))) {
+          deletedIds.push(String(removed.id));
+        }
+        const phone = (removed.phone || '').replace(/[^0-9]/g, '');
+        if (phone && !deletedIds.includes(phone)) {
+          deletedIds.push(phone);
+        }
+        localStorage.setItem('aastha_deleted_volunteers', JSON.stringify(deletedIds));
+      } else if (volunteers.length > 0) {
+        volunteers.shift();
+      }
+
       localStorage.setItem('aastha_volunteers', JSON.stringify(volunteers));
       renderVolunteerApplicants();
       updateLiveCountersUI(true);
-      showToast('Applicant removed.');
+      showToast('🗑️ Application removed.');
+    }
+
+    function clearAllApplicants() {
+      let volunteers = [];
+      try {
+        volunteers = JSON.parse(localStorage.getItem('aastha_volunteers') || '[]');
+      } catch (e) { volunteers = []; }
+
+      if (volunteers.length === 0) {
+        showToast('Application roster is already empty.');
+        return;
+      }
+
+      let deletedIds = [];
+      try {
+        deletedIds = JSON.parse(localStorage.getItem('aastha_deleted_volunteers') || '[]');
+      } catch (e) { deletedIds = []; }
+
+      volunteers.forEach(v => {
+        if (v.id && !deletedIds.includes(String(v.id))) deletedIds.push(String(v.id));
+        const phone = (v.phone || '').replace(/[^0-9]/g, '');
+        if (phone && !deletedIds.includes(phone)) deletedIds.push(phone);
+      });
+
+      localStorage.setItem('aastha_deleted_volunteers', JSON.stringify(deletedIds));
+      localStorage.setItem('aastha_volunteers', JSON.stringify([]));
+      renderVolunteerApplicants();
+      updateLiveCountersUI(true);
+      showToast('🗑️ All volunteer applications cleared!');
     }
 
     function exportApplicantsCSV() {
@@ -2623,7 +2742,18 @@
 
     function getStoredDrives() {
       try {
-        return JSON.parse(localStorage.getItem('aastha_drives_log') || '[]');
+        let drives = JSON.parse(localStorage.getItem('aastha_drives_log') || '[]');
+        let modified = false;
+        drives.forEach((d, idx) => {
+          if (!d.id) {
+            d.id = 'drv_' + (Date.now() - idx * 1000) + '_' + Math.floor(Math.random() * 10000);
+            modified = true;
+          }
+        });
+        if (modified) {
+          localStorage.setItem('aastha_drives_log', JSON.stringify(drives));
+        }
+        return drives;
       } catch (e) {
         return [];
       }
@@ -2660,7 +2790,7 @@
 
       const drives = getStoredDrives();
       drives.unshift({
-        id: 'drv_' + Date.now(),
+        id: 'drv_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
         title,
         date,
         location,
@@ -2677,21 +2807,19 @@
       document.getElementById('inpMgrVolunteers').value = '';
       document.getElementById('inpMgrNotes').value = '';
 
-      try {
-        const cached = JSON.parse(localStorage.getItem('rensetu_cloud_stats') || '{"volunteers":0,"drives":0,"kids":0}');
-        const newDrives = (cached.drives || 0) + 1;
-        const newKids = (cached.kids || 0) + kids;
-        setCloudStats(cached.volunteers || 0, newDrives, newKids);
-      } catch(e) {}
-
-      showToast('✦ Drive logged!');
+      showToast('✦ Drive saved to history!');
       switchManagerTab('history');
     }
 
     function renderDrivesHistory() {
       const listEl = document.getElementById('drivesHistoryList');
+      const countBadge = document.getElementById('drivesHistoryCountBadge');
       if (!listEl) return;
       const drives = getStoredDrives();
+
+      if (countBadge) {
+        countBadge.textContent = `${drives.length} Drive${drives.length === 1 ? '' : 's'} Recorded`;
+      }
 
       if (drives.length === 0) {
         listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 24px;">No drives recorded yet. Log your first drive above!</div>`;
@@ -2710,18 +2838,35 @@
             </div>
             ${d.notes ? `<div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">"${escapeHtml(d.notes)}"</div>` : ''}
           </div>
-          <button type="button" class="delete-drive-btn" onclick="deleteDrive('${d.id}')">Delete</button>
+          <button type="button" class="delete-drive-btn" data-id="${escapeHtml(d.id)}" onclick="deleteDrive(this.getAttribute('data-id'))">🗑️ Delete</button>
         </div>
       `).join('');
     }
 
     function deleteDrive(driveId) {
-      if (!confirm('Remove this drive entry?')) return;
-      let drives = getStoredDrives().filter(d => d.id !== driveId);
+      let drives = getStoredDrives();
+      const idx = drives.findIndex(d => String(d.id) === String(driveId));
+
+      if (idx !== -1) {
+        drives.splice(idx, 1);
+      } else if (drives.length > 0) {
+        drives.shift();
+      }
+
       localStorage.setItem('aastha_drives_log', JSON.stringify(drives));
       renderDrivesHistory();
-      updateLiveCountersUI(true);
-      showToast('Drive removed.');
+      showToast('🗑️ Drive removed from history.');
+    }
+
+    function clearAllDrives() {
+      const drives = getStoredDrives();
+      if (!drives || drives.length === 0) {
+        showToast('Drive history is already empty.');
+        return;
+      }
+      localStorage.setItem('aastha_drives_log', JSON.stringify([]));
+      renderDrivesHistory();
+      showToast('🗑️ All recorded drives removed!');
     }
 
     function saveDirectStatsOverride() {
