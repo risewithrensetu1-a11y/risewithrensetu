@@ -2285,16 +2285,23 @@
     // ========================================================
     const ORGANIZER_PIN = '2026';
 
-    // Secret URL Trigger: Add #admin to the website link (e.g. risewithrensetu.github.io/#admin)
+    // Secret URL Trigger: Open with #admin or ?admin
     function checkAdminHashAccess() {
       const hash = (window.location.hash || '').toLowerCase();
-      if (hash === '#admin' || hash === '#organizer') {
-        openPinModal();
+      const search = (window.location.search || '').toLowerCase();
+      if (hash.includes('admin') || hash.includes('organizer') || search.includes('admin') || search.includes('organizer')) {
+        setTimeout(openPinModal, 80);
       }
     }
 
+    // Run immediately on page load, DOM ready, and hash changes
+    checkAdminHashAccess();
     window.addEventListener('hashchange', checkAdminHashAccess);
-    window.addEventListener('DOMContentLoaded', checkAdminHashAccess);
+    window.addEventListener('load', checkAdminHashAccess);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', checkAdminHashAccess);
+    }
+    setTimeout(checkAdminHashAccess, 300);
 
     function openModal(modalId) {
       const modal = document.getElementById(modalId);
@@ -2304,8 +2311,12 @@
     function closeModal(modalId) {
       const modal = document.getElementById(modalId);
       if (modal) modal.classList.remove('open');
-      if (modalId === 'pinModal' && (window.location.hash.toLowerCase() === '#admin' || window.location.hash.toLowerCase() === '#organizer')) {
-        history.replaceState(null, '', window.location.pathname + window.location.search);
+      if (modalId === 'pinModal') {
+        const h = (window.location.hash || '').toLowerCase();
+        const s = (window.location.search || '').toLowerCase();
+        if (h.includes('admin') || h.includes('organizer') || s.includes('admin') || s.includes('organizer')) {
+          history.replaceState(null, '', window.location.pathname);
+        }
       }
     }
 
@@ -2341,6 +2352,8 @@
           pinInp.select();
         }
       }
+    }
+
     async function fetchCloudApplicants() {
       const webhookUrl = getCustomWebhook();
       if (!webhookUrl || !webhookUrl.startsWith('http')) return;
